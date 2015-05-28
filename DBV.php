@@ -62,6 +62,43 @@ class DBV
     }
 
     /**
+     * Get paths based on selected database. Make the directory if it doesn't exist.
+     * @return path
+     */
+    protected function getSchemaPath()
+    {
+        $path = DBV_SCHEMA_PATH . DS . $this->_adapter->getActiveDatabase();
+
+        if ( ! is_dir($path)) {
+            mkdir($path);
+        }
+
+        return $path;
+    }
+
+    protected function getRevisionsPath()
+    {
+        $path = DBV_REVISIONS_PATH . DS . $this->_adapter->getActiveDatabase();
+
+        if ( ! is_dir($path)) {
+            mkdir($path);
+        }
+
+        return $path;
+    }
+
+    protected function getMetaPath()
+    {
+        $path = DBV_META_PATH . DS . $this->_adapter->getActiveDatabase();
+
+        if ( ! is_dir($path)) {
+            mkdir($path);
+        }
+
+        return $path;
+    }
+
+    /**
      * @return DBV_Adapter_Interface
      */
     protected function _getAdapter()
@@ -80,12 +117,14 @@ class DBV
                     } catch (DBV_Exception $e) {
                         $this->error("[{$e->getCode()}] " . $e->getMessage());
                     }
-                    if(isset($_GET['activeDatabase'])) {
+
+                    if (isset($_GET['activeDatabase'])) {
                         $_SESSION['DBV_ACTIVE_DATABASE'] = $_GET['activeDatabase'];
                         $this->_adapter->setActiveDatabase($_GET['activeDatabase']);
-                    } elseif(isset($_SESSION['DBV_ACTIVE_DATABASE'])) {
-                        $this->_adapter->setActiveDatabase($_SESSION['DBV_ACTIVE_DATABASE']);
+                    } else if ( ! isset($_SESSION['DBV_ACTIVE_DATABASE'])) {
+                        $_SESSION['DBV_ACTIVE_DATABASE'] = DB_NAME;
                     }
+
                 }
             }
         }
@@ -155,7 +194,7 @@ class DBV
 
                 if (count($files)) {
                     foreach ($files as $file) {
-                        $file = DBV_REVISIONS_PATH . DS . $revision . DS . $file;
+                        $file = $this->getRevisionsPath() . DS . $revision . DS . $file;
                         if (!$this->_runFile($file)) {
                             break 2;
                         }
@@ -196,7 +235,7 @@ class DBV
             ));
         }
 
-        $path = DBV_REVISIONS_PATH . DS . $revision . DS . $file;
+        $path = $this->getRevisionsPath() . DS . $revision . DS . $file;
         if (!file_exists($path)) {
             $this->_404();
         }
@@ -214,14 +253,14 @@ class DBV
 
     protected function _createSchemaObject($item)
     {
-        $file = DBV_SCHEMA_PATH . DS . "$item.sql";
+        $file = $this->getSchemaPath() . DS . "$item.sql";
 
         if (file_exists($file)) {
             if ($this->_runFile($file)) {
                 $this->confirm("Created schema object <strong>$item</strong>");
             }
         } else {
-            $this->error("Cannot find file for schema object <strong>$item</strong> (looked in " . DBV_SCHEMA_PATH . ")");
+            $this->error("Cannot find file for schema object <strong>$item</strong> (looked in " . $this->getSchemaPath() . ")");
         }
     }
 
@@ -230,7 +269,7 @@ class DBV
         try {
             $sql = $this->_getAdapter()->getSchemaObject($item);
 
-            $file = DBV_SCHEMA_PATH . DS . "$item.sql";
+            $file = $this->getSchemaPath() . DS . "$item.sql";
 
             if (@file_put_contents($file, $sql)) {
                 $this->confirm("Wrote file: <strong>$file</strong>");
@@ -323,7 +362,7 @@ class DBV
     {
         $return = array();
 
-        foreach (new DirectoryIterator(DBV_SCHEMA_PATH) as $file) {
+        foreach (new DirectoryIterator($this->getSchemaPath()) as $file) {
             if ($file->isFile() && pathinfo($file->getFilename(), PATHINFO_EXTENSION) == 'sql') {
                 $return[] = pathinfo($file->getFilename(), PATHINFO_FILENAME);
             }
@@ -336,7 +375,7 @@ class DBV
     {
         $return = array();
 
-        foreach (new DirectoryIterator(DBV_REVISIONS_PATH) as $file) {
+        foreach (new DirectoryIterator($this->getRevisionsPath()) as $file) {
             if ($file->isDir() && !$file->isDot()) {
                 $return[] = $file->getBasename();
             }
@@ -352,7 +391,7 @@ class DBV
     protected function _getCurrentRevision($database=false)
     {   
         $database = !$database ? $this->_getAdapter()->getActiveDatabase() : $database;
-        $file = DBV_META_PATH . DS . $database . '.revision';
+        $file = $this->getMetaPath() . '.revision';
         if (file_exists($file)) {
             return trim(file_get_contents($file));
         }
@@ -361,7 +400,7 @@ class DBV
 
     protected function _setCurrentRevision($revision)
     {
-        $file = DBV_META_PATH . DS . $this->_getAdapter()->getActiveDatabase() . '.revision';
+        $file = $this->getMetaPath() . '.revision';
         if (!@file_put_contents($file, $revision)) {
             $this->error("Cannot write revision file");
         }
@@ -369,7 +408,7 @@ class DBV
 
     protected function _getRevisionFiles($revision)
     {
-        $dir = DBV_REVISIONS_PATH . DS . $revision;
+        $dir = $this->getRevisionsPath() . DS . $revision;
         $return = array();
 
         foreach (new DirectoryIterator($dir) as $file) {
@@ -384,7 +423,7 @@ class DBV
 
     protected function _getRevisionFileContents($revision, $file)
     {
-        $path = DBV_REVISIONS_PATH . DS . $revision . DS . $file;
+        $path = $this->getRevisionsPath() . DS . $revision . DS . $file;
         if (file_exists($path)) {
             return file_get_contents($path);
         }
